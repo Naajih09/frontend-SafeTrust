@@ -1,31 +1,36 @@
 # Integration Roadmap
 
-This skeleton uses mock data so the UI can be developed independently of the
-production dApp. The production promotion keeps component return shapes stable
-while replacing the mock layer with Apollo, Hasura, and Firebase.
+This skeleton uses mock data so the UI can be developed independently of the production dApp. The production promotion keeps component return shapes stable while replacing the mock layer with Apollo, Hasura, and Firebase.
+
+Status values:
+
+- **done**: implemented in this repo and verified.
+- **in progress**: partly implemented, or open as an issue or PR.
+- **planned**: not started.
+
+> **Basis:** `src/hooks/`, `src/lib/mockData`, `src/features/apartments`, and `src/features/escrow` as supplied in review, at commit `ad2f38d7`. Each status below must be checked against the repo before merge.
 
 ## Mock-to-production mapping
 
-| Skeleton                         | Production dApp                                                                                                               |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `useApartments()`                | Apollo `useQuery(GET_APARTMENTS)`                                                                                             |
-| `useEscrowSubscription()` (mock) | Apollo `useSubscription(ESCROW_STATUS_SUBSCRIPTION)` over `graphql-ws`                                                        |
-| `MOCK_APARTMENTS`                | Hasura `public.apartments`                                                                                                    |
-| `MOCK_MESSAGES`                  | GraphQL conversation subscription                                                                                             |
-| `setTimeout` mutations           | Apollo mutations                                                                                                              |
-| `mock-owner-1`                   | Firebase UID from the verified JWT                                                                                            |
-| Escrow status webhooks           | `backend-SafeTrust` — signature and timestamp validation with replay protection, persisted in `trustless_work_webhook_events` |
+| Skeleton | Production dApp | Status | Issue |
+| --- | --- | --- | --- |
+| `useApartments()` | Apollo `useQuery(GET_APARTMENTS)` | in progress (the live Hasura adapter exists in `src/features/apartments`; screens that still use the mock hook are not yet wired) | not yet tracked |
+| `useEscrowSubscription()` (mock) | Apollo `useSubscription(ESCROW_STATUS_SUBSCRIPTION)` over `graphql-ws` | planned | not yet tracked |
+| `MOCK_APARTMENTS` | Hasura `public.apartments` | in progress | not yet tracked |
+| `MOCK_MESSAGES` | GraphQL conversation subscription | planned | not yet tracked |
+| `setTimeout` mutations | Apollo mutations | in progress (repository pattern replaces stubs; see Skeleton Architecture) | #696 |
+| `mock-owner-1` | Firebase UID from the verified JWT | planned | not yet tracked |
+| Escrow status webhooks | `backend-SafeTrust`: signature and timestamp validation with replay protection, persisted in `trustless_work_webhook_events` | planned (lives in backend-SafeTrust, not this repo) | not yet tracked |
 
 ## Apollo and Hasura
 
-Install `@apollo/client`, `graphql`, and `graphql-ws` in the production dApp.
-Use an HTTP link for queries and mutations and a WebSocket link for
-subscriptions. Attach the current Firebase ID token as a Bearer token to both
-transports. Keep apartment queries paginated with `limit`, `offset`, and an
-owner filter; return the same `data`, `loading`, and `error` shape as the mock
-hook.
+Install `@apollo/client`, `graphql`, and `graphql-ws` in the production dApp. Use an HTTP link for queries and mutations and a WebSocket link for subscriptions. Attach the current Firebase ID token as a Bearer token to both transports. Keep apartment queries paginated with `limit`, `offset`, and an owner filter. Return the same `data`, `loading`, and `error` shape as the mock hook.
 
-### Escrow Subscriptions Contract
+Status: **planned**. Not yet tracked.
+
+### Escrow subscriptions contract
+
+Status: **planned**. This is the target contract. It is not implemented in this repo.
 
 ```graphql
 subscription EscrowStatusUpdates($escrowId: uuid!) {
@@ -62,28 +67,39 @@ subscription UserEscrowActivity($userId: uuid!) {
 }
 ```
 
+> **Basis:** the target contract in the previous version of this document.
+> **Not yet verified:** `src/hooks/useEscrowSubscription.ts` return shape, and the contract against the Hasura schema.
+
 ## Firebase JWT flow
+
+Status: **planned** for the Hasura side. The client Firebase login and SEP-10 session exist today (see Skeleton Architecture § Auth store).
 
 1. The client signs in with Firebase and stores the short-lived ID token.
 2. Apollo sends that token to Hasura on each request.
 3. Hasura validates the JWT and maps its `sub` claim to `X-Hasura-User-Id`.
-4. The `user` role may read public listings; host writes are restricted to
-   rows whose `owner_id` matches that claim.
-5. Server-only operations verify the token with `firebase-admin`; never expose
-   the admin private key or log token contents.
+4. The `user` role may read public listings. Host writes are restricted to rows whose `owner_id` matches that claim.
+5. Server-only operations verify the token with `firebase-admin`. Never expose the admin private key or log token contents.
+
+> **Basis:** the client auth description in the Skeleton Architecture document.
+> **Not yet verified:** the Firebase client paths under `src/lib/firebase`. Hasura row permissions are not in this repo, so steps 2 to 4 are a target until the dApp schema is checked.
 
 ## Required production configuration
 
-`NEXT_PUBLIC_HASURA_GRAPHQL_URL`, `NEXT_PUBLIC_HASURA_WS_URL`,
-`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, and
-`NEXT_PUBLIC_FIREBASE_PROJECT_ID` are client configuration. Firebase Admin
-credentials are server-only secrets. The skeleton can use
-`NEXT_PUBLIC_SKIP_AUTH_MIDDLEWARE=true` locally; production must disable it.
+Status: **planned**. These variables are documented targets.
+
+- Client: `NEXT_PUBLIC_HASURA_GRAPHQL_URL`, `NEXT_PUBLIC_HASURA_WS_URL`, `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, and `NEXT_PUBLIC_FIREBASE_PROJECT_ID`.
+- Server only: Firebase Admin credentials. These are secrets and must not appear in client code.
+- Local only: `NEXT_PUBLIC_SKIP_AUTH_MIDDLEWARE=true` lets the skeleton run without auth. Production must disable it.
+
+> **Basis:** the variable names in the previous version of this document.
+> **Not yet verified:** each name in `.env.example` at commit `ad2f38d7`.
 
 ## Promotion checklist
 
-- Replace each mock hook with its Apollo equivalent without changing the UI contract.
-- Replace delayed stub mutations with authenticated mutations and error states.
-- Add loading, empty, and permission-denied states.
-- Verify Hasura row permissions with guest, host, and admin users.
-- Test subscriptions and token expiry against a staging project.
+Status: **planned**.
+
+- [ ] Replace each mock hook with its Apollo equivalent without changing the UI contract.
+- [ ] Replace delayed stub mutations with authenticated mutations and error states.
+- [ ] Add loading, empty, and permission-denied states.
+- [ ] Verify Hasura row permissions with guest, host, and admin users.
+- [ ] Test subscriptions and token expiry against a staging project.
