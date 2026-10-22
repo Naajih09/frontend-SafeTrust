@@ -33,35 +33,27 @@ src/
 │       ├── model/           types, schemas, state machines, pure logic
 │       └── *.test.ts(x)     co-located tests
 ├── components/
-│   ├── ui/              Current. shadcn primitives: stateless, no data, no auth, no wallet
-│   └── layouts/         Current. App shell: Header, SideBar, DemoBanner, nav config
-├── server/              Planned. Server-only code (firebase-admin, SEP-10, secrets).
-│                        Today this code lives in src/lib/auth/*-server.ts and src/app/api/.
-├── lib/                 Current. Framework-free helpers shared by two or more features
-├── providers/           Current. AppProviders mounted in the root layout. Per-route-group
-│                        composition is Planned.
-├── config/              env.ts (client) and env.server.ts (server)
-└── types/               Cross-feature types only. Feature types live in features/<x>/model
+│   ├── ui/          shadcn primitives: stateless, no data, no auth, no wallet
+│   └── layout/      app shell: Header, SideBar, DemoBanner, nav config
+├── server/          server-only code: firebase-admin, SEP-10, secrets (FE-48)
+├── lib/             framework-free helpers shared by ≥2 features (format, geo, utils, firebase client)
+├── providers/       React providers composed per route group (FE-54)
+├── config/          env.ts (client) / env.server.ts (server)
+└── types/           cross-feature types only (feature types live in features/<x>/model)
 ```
-
-> **Verified against:** `src/features/`, `src/components/layouts/`, `src/lib/auth/`, `src/app/api/` at `ad2f38d7`. The `components/layouts/` path is corrected from `components/layout/`. `src/server/` does not exist yet.
-
-Note on the old path: earlier versions of this document named `components/layout/`. The folder is `components/layouts/`.
 
 ---
 
-## 2. Permitted vs Forbidden Import Table (Current, with Planned rows marked)
+## 2. Permitted vs Forbidden Import Table
 
-| Layer | May import | Must NOT import |
-| --- | --- | --- |
-| `app/` | Everything except another route's private files | — |
-| `features/<x>` | `components/ui`, `components/layouts`, `lib`, `config/env`, `types`, **other features only via their `index.ts`** | `app/`, `server/`, another feature's internal modules (`@/features/*/*`) |
-| `components/ui` | `lib/utils` only | `features`, `hooks`, `providers`, `data`, `server/` |
-| `components/layouts` | `components/ui`, `lib`, `features/*/index.ts` (auth state only) | `server/`, demo data |
-| `server/` (Planned) | `config/env.server`, `lib` | Anything client (`"use client"` modules, React) |
-| `lib/` | `config`, `types` | `features`, `components`, `server/` |
-
-> **Verified against:** `eslint.config.mjs`, `src/components/layouts/`, `src/features/` at `ad2f38d7`. Status: Current. The `server/` row is Planned until `src/server/` exists.
+| Layer               | May import                                                                                                       | Must NOT import                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `app/`              | Everything except another route's private files                                                                  | —                                                                        |
+| `features/<x>`      | `components/ui`, `components/layout`, `lib`, `config/env`, `types`, **other features only via their `index.ts`** | `app/`, `server/`, another feature's internal modules (`@/features/*/*`) |
+| `components/ui`     | `lib/utils` only                                                                                                 | `features`, `hooks`, `providers`, `data`, `server/`                      |
+| `components/layout` | `components/ui`, `lib`, `features/*/index.ts` (auth state only)                                                  | `server/`, demo data                                                     |
+| `server/`           | `config/env.server`, `lib`                                                                                       | Anything client (`"use client"` modules, React)                          |
+| `lib/`              | `config`, `types`                                                                                                | `features`, `components`, `server/`                                      |
 
 ---
 
@@ -73,28 +65,24 @@ Note on the old path: earlier versions of this document named `components/layout
 
 > **Verified against:** `src/features/` layout at `ad2f38d7`. Status: Current for rules 1 and 3, Planned for the per-group error boundary in rule 2.
 
+Status: Current · Verified against ad2f38d7
+
 ---
 
 ## 4. ESLint Boundary Enforcement (Current, with Planned rules marked)
 
 Rules in `eslint.config.mjs` enforce these layer boundaries:
 
-- **Presentational UI isolation** (`src/components/ui/**`): banned from importing `@/features/*`, `@/hooks/*`, `@/providers/*`, `@/server/*`, `@/lib/mockData*`, `@/lib/demo*`.
-- **Feature encapsulation** (`src/features/**`): banned from deep imports into other features (`@/features/*/*`).
-- **Shared library purity** (`src/lib/**`): banned from depending on `@/features/*`, `@/components/*`, or `@/server/*`.
-- **Module escape prevention** (`src/**`): relative imports that escape module boundaries (`../../../*`) are banned in favor of the `@/` path alias.
-
-The `@/server/*` patterns apply once `src/server/` exists (Planned).
-
-> **Verified against:** `eslint.config.mjs` at `ad2f38d7`. Confirm each pattern is present in the file before relying on it.
+- **Presentational UI isolation (`src/components/ui/**/*.{ts,tsx}`)**: Banned from importing `@/features/*`, `@/hooks/*`, `@/providers/*`, `@/server/*`, `@/lib/mockData*`, `@/lib/demo*`.
+- **Feature encapsulation (`src/features/**/*.{ts,tsx}`)**: Banned from deep imports into other features (`@/features/*/*`) and cannot reach `@/server/*` or `@/app/*`.
+- **Shared library purity (`src/lib/**/*.{ts,tsx}`)**: Banned from depending on `@/features/*`, `@/components/*`, or `@/server/*`.
+- **Module escape prevention**: Relative imports escaping module boundaries (`../../../*`) are banned across `src/**/*.{ts,tsx}` in favor of the clean `@/` path alias.
 
 ---
 
 ## 5. Route Groups & Runtime Profiles (Planned)
 
-Route groups are **Planned**. `src/app/` has no route groups today. The table below is the target design, not the current state.
-
-The target segments the application by runtime profile, so providers and heavy dependencies (such as `@creit.tech/stellar-wallets-kit` and `@trustless-work/escrow`) mount once per group layout rather than per page or globally at root.
+Route groups segment the application by runtime profile, ensuring providers and heavy dependencies (such as `@creit.tech/stellar-wallets-kit` and `@trustless-work/escrow`) are mounted once per group layout rather than per page or globally at root.
 
 ### Target group profiles
 
@@ -105,7 +93,5 @@ The target segments the application by runtime profile, so providers and heavy d
 | `(app)` | `/dashboard/**` | `AuthProvider` + `QueryProvider` + sidebar shell | ≤ 260 kB |
 | `(checkout)` | `/rent/[id]/escrow/**`, `/hotels/[id]/book`, `/room`, `/bookings/**` | `AuthProvider` + `QueryProvider` + `WalletProviderScoped` + `EscrowProviders` | ≤ 350 kB |
 
-- **Root `src/app/layout.tsx`** (Current): HTML, body fonts, `globals.css`, `ThemeProvider`, `DemoBanner`, and `Toaster`. Target: no data, auth, or wallet providers in the root layout. Today `AppProviders` is mounted there. See [Skeleton Architecture § Provider tree](SKELETON_ARCHITECTURE.md#provider-tree-current).
-- **Provider rule** (Planned): pages never mount providers. This is checked with `grep -rn "Provider" src/app --include=page.tsx`, which must return no mounts. Route groups do not exist yet, so this rule is a target.
-
-> **Verified against:** `src/app/` (no route groups) and `src/app/layout.tsx` at `ad2f38d7`. Status: Planned for the table and provider rule; Current for the root layout.
+- **Root `src/app/layout.tsx`**: Thin shell containing HTML, body fonts, `globals.css`, `ThemeProvider`, `DemoBanner`, and `Toaster`. Contains **no** data, auth, or wallet providers.
+- **Provider Rule**: Pages never mount providers (`grep -rn "Provider" src/app --include=page.tsx` must return 0 mounts). All providers are composed at the route group layout level.
